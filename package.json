@@ -105,6 +105,7 @@
       },
       "android": {
         "binaryPath": "example/android/app/build/outputs/apk/release/app-release.apk",
+        "testBinaryPath": "example/android/app/build/outputs/apk/androidTest/release/app-release-androidTest.apk",
         "build": ".circleci/scripts/run_android_e2e.sh",
         "type": "android.emulator",
         "name": "Emu_E2E"

@@ -41,67 +41,76 @@ default config for android apk builds: &android_defaults
 # CACHE CONFIG
 # ==============================
 
-# brew
-save brew cache: &cache_save_brew
-  name: Saving Brew cache
-  paths:
+cache keys:
+  brew ios: &key_brew_ios cache-brew-ios-v1-{{ arch }}
+  brew android: &key_brew_android cache-brew-android-v1-{{ arch }}
+  yarn: &key_yarn cache-yarn-{{ checksum "package.json" }}-{{ arch }}
+  gradle: &key_gradle cache-gradle-{{ checksum "example/android/gradle/wrapper/gradle-wrapper.properties" }}-{{ checksum "example/android/app/build.gradle" }}-{{ arch }}
+  pods: &key_pods cache-pods-{{ checksum "example/ios/Podfile.lock" }}
+
+cache:
+  # brew
+  save brew cache for ios: &cache_save_brew_ios
+    name: Saving Brew cache
+    paths:
+      - /usr/local/Homebrew
+      - ~/Library/Caches/Homebrew
+    key: *key_brew_ios
+
+  restore brew cache for ios: &cache_restore_brew_ios
+    name: Restoring Brew cache
+    keys:
+      - *key_brew_ios
+
+  save brew cache for android: &cache_save_brew_android
+    name: Saving Brew cache for android
+    paths:
     - /usr/local/Homebrew
     - ~/Library/Caches/Homebrew
-  key: legacy-brew-cache-node12-{{ arch }}
+    key: *key_brew_android
 
-restore brew cache: &cache_restore_brew
-  name: Restoring Brew cache
-  keys:
-    - legacy-brew-cache-node12-{{ arch }}
+  restore brew cache for android: &cache_restore_brew_android
+    name: Restoring Brew cache for android
+    keys:
+    - *key_brew_android
 
-save brew cache for android: &cache_save_brew_android
-  name: Saving Brew cache for android
-  paths:
-  - /usr/local/Homebrew
-  - ~/Library/Caches/Homebrew
-  key: legacy-brew-cache-node12-{{ arch }}-android-v1
+  # yarn
+  save yarn cache: &cache_save_yarn
+    name: Saving Yarn cache
+    paths:
+      - ~/.cache/yarn
+      - ~/Library/Detox
+    key: *key_yarn
 
-restore brew cache for android: &cache_restore_brew_android
-  name: Restoring Brew cache for android
-  keys:
-  - legacy-brew-cache-node12-{{ arch }}-android-v1
+  restore yarn cache: &cache_restore_yarn
+    name: Restoring Yarn cache
+    keys:
+      - *key_yarn
 
-# yarn
-save yarn cache: &cache_save_yarn
-  name: Saving Yarn cache
-  paths:
-    - ~/.cache/yarn
-    - ~/Library/Detox
-  key: legacy-yarn-cache-{{ checksum "package.json" }}-{{ arch }}
+  # gradle
+  save gradle cache: &cache_save_gradle
+    name: Saving Gradle cache
+    key: *key_gradle
+    paths:
+      - ~/.gradle/wrapper
+      - ~/.gradle/caches
 
-restore yarn cache: &cache_restore_yarn
-  name: Restoring Yarn cache
-  keys:
-    - legacy-yarn-cache-{{ checksum "package.json" }}-{{ arch }}
+  restore gradle cache: &cache_restore_gradle
+    name: Restoring Gradle cache
+    keys:
+      - *key_gradle
 
-# gradle
-save gradle wrapper cache: &cache_save_gradle_wrapper
-  name: Saving Gradle Wrapper cache
-  paths:
-    - ~/.gradle/wrapper
-  key: gradle-wrapper-legacy-{{ checksum "example/android/gradle/wrapper/gradle-wrapper.properties" }}
+  # cocoapods
+  save pods cache: &cache_save_pods
+    name: Saving Pods
+    key: *key_pods
+    paths:
+      - example/ios/Pods
 
-save gradle build cache: &cache_save_gradle_build
-  name: Saving Gradle app/build cache
-  paths:
-    - ~/.gradle/caches
-  key: app-build-gradle-legacy-{{ checksum "example/android/app/build.gradle" }}
-
-restore gradle wrapper cache: &cache_restore_gradle_wrapper
-  name: Restoring Gradle Wrapper cache
-  keys:
-    - gradle-wrapper-legacy-{{ checksum "example/android/gradle/wrapper/gradle-wrapper.properties" }}
-
-restore gradle build cache: &cache_restore_gradle_build
-  name: Restoring Gradle app/build cache
-  keys:
-    - app-build-gradle-legacy-{{ checksum "example/android/app/build.gradle" }}
-
+  restore pods cache: &cache_restore_pods
+    name: Restoring Pods
+    keys:
+      - *key_pods
 
 # ==============================
 # JOBS
@@ -141,23 +150,25 @@ jobs:
     <<: *macos_defaults
     steps:
       - *addWorkspace
-      - restore-cache: *cache_restore_brew
+      - restore-cache: *cache_restore_brew_ios
       - run:
           name: Configure macOS Environment
           command: |
             brew bundle --file=.circleci/Brewfile.ios --no-lock
             touch .watchmanconfig
             node -v
-      - save-cache: *cache_save_brew
+      - save-cache: *cache_save_brew_ios
       - restore-cache: *cache_restore_yarn
       - run:
           name: Installing Yarn dependencies
           command: yarn --pure-lockfile --non-interactive --cache-folder ~/.cache/yarn
       - save-cache: *cache_save_yarn
+      - restore-cache: *cache_restore_pods
       - run:
           name: Install pod dependencies
           working_directory: example/ios
           command: pod install
+      - save-cache: *cache_save_pods
       - run:
           name: Build iOS app
           command: yarn build:e2e:ios
@@ -174,18 +185,12 @@ jobs:
           name: Installing Yarn dependencies
           command: yarn --pure-lockfile --non-interactive --cache-folder ~/.cache/yarn
       - save-cache: *cache_save_yarn
-
-      # Gradle
-      - restore-cache: *cache_restore_gradle_wrapper
-      - restore-cache: *cache_restore_gradle_build
+      - restore-cache: *cache_restore_gradle
       - run:
           name: Downloading Gradle dependencies
           working_directory: example/android
           command: ./gradlew --max-workers 2 fetchDependencies
-      - save-cache: *cache_save_gradle_wrapper
-      - save-cache: *cache_save_gradle_build
-
-    # Build and test
+      - save-cache: *cache_save_gradle
       - run:
           name: Bundle
           command: mkdir example/android/app/src/main/assets && npx react-native bundle --platform android --dev false --entry-file example/index.js --bundle-output example/android/app/src/main/assets/index.android.bundle --assets-dest example/android/app/src/main/res/
@@ -212,12 +217,7 @@ jobs:
             echo 'export QEMU_AUDIO_DRV=none' >> $BASH_ENV
             echo 'export JAVA_HOME=$(/usr/libexec/java_home)' >> $BASH_ENV
             source $BASH_ENV
-
-    # Android tools
       - restore-cache: *cache_restore_brew_android
-      - run:
-          name: Create repos file
-          command: mkdir -p ~/.android && touch ~/.android/repositories.cfg
       - run:
           name: Install Android SDK tools
           command: |

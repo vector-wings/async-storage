@@ -24,7 +24,14 @@ default config for macOS: &macos_defaults
   <<: *defaults
   resource_class: 'medium'
   macos:
-    xcode: '11.0.0'
+    xcode: '11.7.0'
+
+
+config for macOS (android): &macos_defaults_android
+  <<: *defaults
+  resource_class: 'medium'
+  macos:
+    xcode: '11.5.0'
 
 default config for android apk builds: &android_defaults
   <<: *defaults
@@ -42,11 +49,11 @@ default config for android apk builds: &android_defaults
 # ==============================
 
 cache keys:
-  brew ios: &key_brew_ios cache-brew-ios-v1-{{ arch }}
-  brew android: &key_brew_android cache-brew-android-v1-{{ arch }}
+  brew ios: &key_brew_ios cache-brew-ios-v3-{{ arch }}
+  brew android: &key_brew_android cache-brew-android-v3-{{ arch }}
   yarn: &key_yarn cache-yarn-{{ checksum "package.json" }}-{{ arch }}
   gradle: &key_gradle cache-gradle-{{ checksum "example/android/gradle/wrapper/gradle-wrapper.properties" }}-{{ checksum "example/android/app/build.gradle" }}-{{ arch }}
-  pods: &key_pods cache-pods-{{ checksum "example/ios/Podfile.lock" }}
+  pods: &key_pods cache-pods-v1-{{ checksum "example/ios/Podfile" }}-{{ checksum "package.json" }}-{{ arch }}
 
 cache:
   # brew
@@ -72,7 +79,7 @@ cache:
   restore brew cache for android: &cache_restore_brew_android
     name: Restoring Brew cache for android
     keys:
-    - *key_brew_android
+      - *key_brew_android
 
   # yarn
   save yarn cache: &cache_save_yarn
@@ -205,7 +212,7 @@ jobs:
             - example/android/app/build/outputs/apk/*
 
   "Test: Android e2e":
-    <<: *macos_defaults
+    <<: *macos_defaults_android
     steps:
       - *addWorkspace
       - run:
@@ -221,6 +228,7 @@ jobs:
       - run:
           name: Install Android SDK tools
           command: |
+            brew update --preinstall
             brew bundle --file=.circleci/Brewfile.android --no-lock
       - save-cache: *cache_save_brew_android
       - run:

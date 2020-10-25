@@ -289,28 +289,27 @@ workflows:
   "Testing":
     jobs:
       - "Setup environment"
-#      - "Test: lint":
-#          requires:
-#            - "Setup environment"
-#      - "Test: flow":
-#          requires:
-#            - "Setup environment"
-#      - "Test: iOS e2e":
-#          requires:
-#            - "Test: lint"
-#            - "Test: flow"
-      - "Build: Android release apk":
+      - "Test: lint":
           requires:
             - "Setup environment"
-#            - "Test: lint"
-#            - "Test: flow"
-#      - "Release":
-#          requires:
-#            - "Test: iOS e2e"
-#            - "Build: Android release apk"
-#          filters:
-#            branches:
-#              only: master
+      - "Test: flow":
+          requires:
+            - "Setup environment"
+      - "Test: iOS e2e":
+          requires:
+            - "Test: lint"
+            - "Test: flow"
+      - "Build: Android release apk":
+          requires:
+            - "Test: lint"
+            - "Test: flow"
+      - "Release":
+          requires:
+            - "Test: iOS e2e"
+            - "Build: Android release apk"
+          filters:
+            branches:
+              only: master
       - "Test: Android e2e":
           requires:
             - "Build: Android release apk"
